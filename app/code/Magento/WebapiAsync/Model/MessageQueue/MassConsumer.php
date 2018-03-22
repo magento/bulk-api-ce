@@ -30,6 +30,8 @@ use Magento\Framework\Serialize\Serializer\Json;
 use Magento\AsynchronousOperations\Api\Data\OperationInterface;
 use Magento\Framework\Bulk\OperationManagementInterface;
 use Magento\WebapiAsync\Model\ConfigInterface as AsyncConfig;
+use Magento\Framework\Webapi\ServiceOutputProcessor;
+use Magento\Framework\Communication\ConfigInterface as CommunicationConfig;
 
 /**
  * Class Consumer used to process OperationInterface messages.
@@ -86,6 +88,16 @@ class MassConsumer implements ConsumerInterface
     private $logger;
 
     /**
+     * @var \Magento\Framework\Webapi\ServiceOutputProcessor
+     */
+    private $serviceOutputProcessor;
+
+    /**
+     * @var \Magento\Framework\Communication\ConfigInterface
+     */
+    private $communicationConfig;
+
+    /**
      * Initialize dependencies.
      *
      * @param \Magento\Framework\MessageQueue\CallbackInvoker $invoker
@@ -96,6 +108,8 @@ class MassConsumer implements ConsumerInterface
      * @param \Magento\Framework\Serialize\Serializer\Json $jsonHelper
      * @param \Magento\Framework\Bulk\OperationManagementInterface $operationManagement
      * @param \Magento\Framework\MessageQueue\MessageController $messageController
+     * @param \Magento\Framework\Webapi\ServiceOutputProcessor $serviceOutputProcessor
+     * @param \Magento\Framework\Communication\ConfigInterface $communicationConfig
      * @param \Psr\Log\LoggerInterface|null $logger
      */
     public function __construct(
@@ -107,6 +121,8 @@ class MassConsumer implements ConsumerInterface
         Json $jsonHelper,
         OperationManagementInterface $operationManagement,
         MessageController $messageController,
+        ServiceOutputProcessor $serviceOutputProcessor,
+        CommunicationConfig $communicationConfig,
         LoggerInterface $logger = null
     ) {
         $this->invoker = $invoker;
@@ -117,6 +133,8 @@ class MassConsumer implements ConsumerInterface
         $this->jsonHelper = $jsonHelper;
         $this->operationManagement = $operationManagement;
         $this->messageController = $messageController;
+        $this->serviceOutputProcessor = $serviceOutputProcessor;
+        $this->communicationConfig = $communicationConfig;
 
         $this->logger = $logger ? : \Magento\Framework\App\ObjectManager::getInstance()->get(LoggerInterface::class);
     }
@@ -209,11 +227,12 @@ class MassConsumer implements ConsumerInterface
             $errorCode = $e->getCode();
             $messages[] = $e->getMessage();
         }
-
+        $outputData = null;
         if ($errorCode === null) {
             foreach ($handlers as $callback) {
                 try {
-                    call_user_func_array($callback, $entityParams);
+                    /** @var \Magento\Catalog\Api\Data\ProductInterface $result */
+                    $outputData = call_user_func_array($callback, $entityParams);
                     $messages[] = sprintf('Service execution success %s::%s', get_class($callback[0]), $callback[1]);
                 } catch (\Zend_Db_Adapter_Exception  $e) {
                     $this->logger->critical($e->getMessage());
@@ -251,13 +270,32 @@ class MassConsumer implements ConsumerInterface
             }
         }
 
+        if (isset($outputData)) {
+            try {
+                $communicationConfig = $this->communicationConfig->getTopic($topicName);
+                $asyncHandler =
+                    $communicationConfig[CommunicationConfig::TOPIC_HANDLERS][AsyncConfig::DEFAULT_HANDLER_NAME];
+                $serviceClass = $asyncHandler[CommunicationConfig::HANDLER_TYPE];
+                $serviceMethod = $asyncHandler[CommunicationConfig::HANDLER_METHOD];
+                $outputData = $this->serviceOutputProcessor->process(
+                    $outputData,
+                    $serviceClass,
+                    $serviceMethod
+                );
+                $outputData = $this->jsonHelper->serialize($outputData);
+            } catch (\Exception $e) {
+                $messages[] = $e->getMessage();
+            }
+        }
+
         $serializedData = (isset($errorCode)) ? $operation->getSerializedData() : null;
         $this->operationManagement->changeOperationStatus(
             $operation->getId(),
             $status,
             $errorCode,
             implode('; ', $messages),
-            $serializedData
+            $serializedData,
+            $outputData
         );
     }
 }
