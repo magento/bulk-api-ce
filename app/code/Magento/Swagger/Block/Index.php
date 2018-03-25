@@ -8,24 +8,51 @@ namespace Magento\Swagger\Block;
 use Magento\Framework\Phrase;
 use Magento\Framework\View\Element\Template;
 use Magento\Swagger\Api\Data\SchemaTypeInterface;
+use Magento\Swagger\Api\SchemaTypesInterface;
 
 /**
  * Block for swagger index page
  *
  * @api
- *
- * @method SchemaTypeInterface[] getSchemaTypes()
- * @method bool hasSchemaTypes()
- * @method string getDefaultSchemaTypeCode()
  */
 class Index extends Template
 {
+    /**
+     * @var SchemaTypesInterface
+     */
+    private $schemaTypes;
+
+    /**
+     * Index constructor.
+     *
+     * @param Template\Context $context
+     * @param SchemaTypesInterface $schemaTypes
+     * @param array $data
+     */
+    public function __construct(
+        Template\Context $context,
+        SchemaTypesInterface $schemaTypes,
+        array $data = []
+    ) {
+        parent::__construct($context, $data);
+
+        $this->schemaTypes = $schemaTypes;
+    }
+
     /**
      * @return mixed|string
      */
     private function getParamStore()
     {
         return $this->getRequest()->getParam('store') ?: 'all';
+    }
+
+    /**
+     * @return bool
+     */
+    private function hasSchemaTypes()
+    {
+        return count($this->schemaTypes->getTypes()) > 0;
     }
 
     /**
@@ -37,18 +64,14 @@ class Index extends Template
             return null;
         }
 
+        $schemaTypes = $this->schemaTypes->getTypes();
+        $defaultType = array_shift($schemaTypes);
         $schemaTypeCode = $this->getRequest()->getParam(
             'type',
-            $this->getDefaultSchemaTypeCode()
+            $defaultType->getCode()
         );
 
-        if (!array_key_exists($schemaTypeCode, $this->getSchemaTypes())) {
-            throw new \UnexpectedValueException(
-                new Phrase('Unknown schema type supplied')
-            );
-        }
-
-        return $this->getSchemaTypes()[$schemaTypeCode];
+        return $this->schemaTypes->getType($schemaTypeCode);
     }
 
     /**
