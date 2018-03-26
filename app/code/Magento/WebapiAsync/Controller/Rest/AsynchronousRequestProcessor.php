@@ -6,6 +6,8 @@
 
 namespace Magento\WebapiAsync\Controller\Rest;
 
+use Magento\Framework\Exception\NotFoundException;
+use Magento\Framework\Phrase;
 use Magento\Webapi\Controller\Rest\RequestProcessorInterface;
 use Magento\Framework\Webapi\Rest\Response as RestResponse;
 use Magento\WebapiAsync\Controller\Rest\Async\InputParamsResolver;
@@ -71,6 +73,9 @@ class AsynchronousRequestProcessor implements RequestProcessorInterface
      */
     public function process(\Magento\Framework\Webapi\Rest\Request $request)
     {
+        if ($request->getHttpMethod() === \Magento\Framework\Webapi\Rest\Request::HTTP_METHOD_GET) {
+            throw new NotFoundException(__('Not found'));
+        }
         $request->setPathInfo(
             str_replace(
                 self::PROCESSOR_PATH,
@@ -95,7 +100,7 @@ class AsynchronousRequestProcessor implements RequestProcessorInterface
             );
 
             $this->response->setStatusCode(RestResponse::STATUS_CODE_202)
-                           ->prepareResponse($responseData);
+                 ->prepareResponse($responseData);
         } catch (\Exception $e) {
             $this->response->setException($e);
         }
