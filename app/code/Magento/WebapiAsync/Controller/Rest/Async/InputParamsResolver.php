@@ -96,7 +96,7 @@ class InputParamsResolver
                 }
             }
         } else {//single item request
-            $webapiResolvedParams[] = $this->resolveSingleParams($inputData);
+            $webapiResolvedParams[] = $this->inputParamsResolver->resolve();
         }
 
         return $webapiResolvedParams;

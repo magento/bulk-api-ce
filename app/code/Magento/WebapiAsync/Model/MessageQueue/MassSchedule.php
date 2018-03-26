@@ -136,17 +136,12 @@ class MassSchedule
     public function publishMass($topicName, $entitiesArray, $groupId = null)
     {
         $bulkDescription = sprintf('Topic %s', $topicName);
-        $userId = (integer) $this->userContext->getUserId();
-
-        if (!isset($userId) || $userId == 0) {
-            $userId = null;
-        }
 
         if ($groupId == null) {
             $groupId = $this->identityService->generateId();
 
             /** create new bulk without operations */
-            $this->bulkManagement->scheduleBulk($groupId, [], $bulkDescription, $userId);
+            $this->bulkManagement->scheduleBulk($groupId, [], $bulkDescription);
         }
         /** @var \Magento\WebapiAsync\Api\Data\AsyncResponseInterface $asyncResponse */
         $asyncResponse = $this->asyncResponseFactory->create();
@@ -201,7 +196,7 @@ class MassSchedule
             );
         }
 
-        $result = $this->bulkManagement->scheduleBulk($groupId, $operations, $bulkDescription, $userId);
+        $result = $this->bulkManagement->scheduleBulk($groupId, $operations, $bulkDescription);
 
         if (!$result) {
             throw new \Magento\Framework\Exception\LocalizedException(
