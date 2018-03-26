@@ -195,6 +195,7 @@ class MassSchedule
                 $errors[] = $requestItem;
             }
         }
+
         if (!empty($errors)) {
             throw new \Magento\Framework\Webapi\Exception(
                 __('Errors while processing entities'),
@@ -217,44 +218,5 @@ class MassSchedule
         $asyncResponse->setRequestItems($requestItemsList);
 
         return $asyncResponse;
-    }
-
-    /**
-     * @param string $groupId
-     * @param string $topicName
-     * @param mixed $data
-     * @param int $operationStatus
-     * @param null $error
-     * @param null $errorCode
-     * @return \Magento\AsynchronousOperations\Api\Data\OperationInterface
-     */
-    private function saveOperation(
-        $groupId,
-        $topicName,
-        $data,
-        $operationStatus = OperationInterface::STATUS_TYPE_OPEN,
-        $error = null,
-        $errorCode = null
-    ) {
-        $serializedData = [
-            'entity_id'        => null,
-            'entity_link'      => '',
-            'meta_information' => $data,
-        ];
-        $data = [
-            'data' => [
-                OperationInterface::BULK_ID         => $groupId,
-                OperationInterface::TOPIC_NAME      => $topicName,
-                OperationInterface::SERIALIZED_DATA => $this->jsonHelper->serialize($serializedData),
-                OperationInterface::STATUS          => $operationStatus,
-                OperationInterface::RESULT_MESSAGE  => $error,
-                OperationInterface::ERROR_CODE      => $errorCode,
-            ],
-        ];
-
-        /** @var \Magento\AsynchronousOperations\Api\Data\OperationInterface $operation */
-        $operation = $this->operationFactory->create($data);
-
-        return $this->entityManager->save($operation);
     }
 }

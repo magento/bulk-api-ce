@@ -95,7 +95,7 @@ class AsynchronousRequestProcessor implements RequestProcessorInterface
             );
 
             $this->response->setStatusCode(RestResponse::STATUS_CODE_202)
-                           ->prepareResponse($responseData);
+                 ->prepareResponse($responseData);
         } catch (\Exception $e) {
             $this->response->setException($e);
         }
