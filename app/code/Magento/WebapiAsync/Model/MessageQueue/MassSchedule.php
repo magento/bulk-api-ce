@@ -136,14 +136,10 @@ class MassSchedule
     public function publishMass($topicName, $entitiesArray, $groupId = null)
     {
         $bulkDescription = sprintf('Topic %s', $topicName);
-        $userId = $this->userContext->getUserId();
+        $userId = (integer) $this->userContext->getUserId();
 
-        /**
-         * set admin userId to 1 because seems it's not work with oAuth
-         * and we need set user id manually
-         */
         if (!isset($userId) || $userId == 0) {
-            $userId = 1;
+            $userId = null;
         }
 
         if ($groupId == null) {
