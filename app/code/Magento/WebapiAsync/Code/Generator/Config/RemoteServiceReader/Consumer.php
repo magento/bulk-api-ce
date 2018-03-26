@@ -34,14 +34,11 @@ class Consumer implements \Magento\Framework\Config\ReaderInterface
      *
      * @param string|null $scope
      * @return array
+     * @SuppressWarnings(PHPMD.UnusedFormalParameter)
      */
     public function read($scope = null)
     {
-        try {
-            $asyncServicesData = $this->webapiAsyncConfig->getServices();
-        } catch (\Exception $e) {
-            return [];
-        }
+        $asyncServicesData = $this->webapiAsyncConfig->getServices();
         $result = [];
         foreach ($asyncServicesData as $serviceData) {
             $topicName = $serviceData[WebApiAsyncConfig::SERVICE_PARAM_KEY_TOPIC];

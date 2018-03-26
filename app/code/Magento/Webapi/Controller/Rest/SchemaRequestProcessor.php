@@ -54,7 +54,7 @@ class SchemaRequestProcessor implements RequestProcessorInterface
         $responseBody = $this->swaggerGenerator->generate(
             $requestedServices,
             $request->getScheme(),
-            $request->getHttpHost(),
+            $request->getHttpHost(false),
             $request->getRequestUri()
         );
         $this->response->setBody($responseBody)->setHeader('Content-Type', 'application/json');
@@ -63,8 +63,11 @@ class SchemaRequestProcessor implements RequestProcessorInterface
     /**
      * {@inheritdoc}
      */
-    public function getProcessorPath()
+    public function canProcess(\Magento\Framework\Webapi\Rest\Request $request)
     {
-        return self::PROCESSOR_PATH;
+        if (strpos(ltrim($request->getPathInfo(), '/'), self::PROCESSOR_PATH) === 0) {
+            return true;
+        }
+        return false;
     }
 }

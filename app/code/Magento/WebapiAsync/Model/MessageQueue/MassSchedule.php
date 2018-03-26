@@ -46,7 +46,7 @@ class MassSchedule
     /**
      * @var \Magento\Framework\Serialize\Serializer\Json
      */
-    private $jsonHelper;
+    private $jsonSerializer;
 
     /**
      * @var \Magento\Framework\EntityManager\EntityManager
@@ -69,16 +69,6 @@ class MassSchedule
     private $itemStatusInterfaceFactory;
 
     /**
-     * @var BulkSummaryInterfaceFactory
-     */
-    private $bulkSummaryFactory;
-
-    /**
-     * @var \Psr\Log\LoggerInterface
-     */
-    private $logger;
-
-    /**
      * @var MessageEncoder
      */
     private $messageEncoder;
@@ -99,46 +89,39 @@ class MassSchedule
      * @param \Magento\AsynchronousOperations\Api\Data\OperationInterfaceFactory $operationFactory
      * @param \Magento\Framework\DataObject\IdentityGeneratorInterface $identityService
      * @param \Magento\Authorization\Model\UserContextInterface $userContextInterface
-     * @param \Magento\Framework\Serialize\Serializer\Json $jsonHelper
+     * @param \Magento\Framework\Serialize\Serializer\Json $jsonSerializer
      * @param \Magento\Framework\EntityManager\EntityManager $entityManager
      * @param \Magento\WebapiAsync\Api\Data\AsyncResponseInterfaceFactory $asyncResponse
      * @param \Magento\WebapiAsync\Api\Data\AsyncResponse\ItemsListInterfaceFactory $itemsListFactory
      * @param \Magento\WebapiAsync\Api\Data\AsyncResponse\ItemStatusInterfaceFactory $itemStatusFactory
-     * @param \Magento\AsynchronousOperations\Api\Data\BulkSummaryInterfaceFactory $bulkSummaryFactory
      * @param \Magento\Framework\MessageQueue\MessageEncoder $messageEncoder
      * @param \Magento\Framework\MessageQueue\MessageValidator $messageValidator
      * @param \Magento\Framework\Bulk\BulkManagementInterface $bulkManagement
-     * @param \Psr\Log\LoggerInterface $logger
      */
     public function __construct(
         OperationInterfaceFactory $operationFactory,
         IdentityGeneratorInterface $identityService,
         UserContextInterface $userContextInterface,
-        Json $jsonHelper,
+        Json $jsonSerializer,
         EntityManager $entityManager,
         AsyncResponseInterfaceFactory $asyncResponse,
         ItemsListInterfaceFactory $itemsListFactory,
         ItemStatusInterfaceFactory $itemStatusFactory,
-        BulkSummaryInterfaceFactory $bulkSummaryFactory,
         MessageEncoder $messageEncoder,
         MessageValidator $messageValidator,
-        BulkManagementInterface $bulkManagement,
-        LoggerInterface $logger
+        BulkManagementInterface $bulkManagement
     ) {
         $this->userContext = $userContextInterface;
         $this->operationFactory = $operationFactory;
         $this->identityService = $identityService;
-        $this->jsonHelper = $jsonHelper;
+        $this->jsonSerializer = $jsonSerializer;
         $this->entityManager = $entityManager;
         $this->asyncResponseFactory = $asyncResponse;
         $this->itemsListInterfaceFactory = $itemsListFactory;
         $this->itemStatusInterfaceFactory = $itemStatusFactory;
-        $this->bulkSummaryFactory = $bulkSummaryFactory;
         $this->messageEncoder = $messageEncoder;
         $this->messageValidator = $messageValidator;
         $this->bulkManagement = $bulkManagement;
-
-        $this->logger = $logger ? : \Magento\Framework\App\ObjectManager::getInstance()->get(LoggerInterface::class);
     }
 
     /**
@@ -175,47 +158,50 @@ class MassSchedule
 
         $operations = [];
         $requestItems = [];
-        foreach ($entitiesArray as $entityParams) {
+        $errors = [];
+        foreach ($entitiesArray as $key => $entityParams) {
             /** @var \Magento\WebapiAsync\Api\Data\AsyncResponse\ItemStatusInterface $requestItem */
             $requestItem = $this->itemStatusInterfaceFactory->create();
 
             try {
                 $this->messageValidator->validate($topicName, $entityParams);
                 $data = $this->messageEncoder->encode($topicName, $entityParams);
-                $operationStatus = OperationInterface::STATUS_TYPE_OPEN;
+
+                $serializedData = [
+                    'entity_id'        => null,
+                    'entity_link'      => '',
+                    'meta_information' => $data,
+                ];
+                $data = [
+                    'data' => [
+                        OperationInterface::BULK_ID         => $groupId,
+                        OperationInterface::TOPIC_NAME      => $topicName,
+                        OperationInterface::SERIALIZED_DATA => $this->jsonSerializer->serialize($serializedData),
+                        OperationInterface::STATUS          => OperationInterface::STATUS_TYPE_OPEN,
+                    ],
+                ];
+
+                /** @var \Magento\AsynchronousOperations\Api\Data\OperationInterface $operation */
+                $operation = $this->operationFactory->create($data);
+                $operations[] = $this->entityManager->save($operation);
+                $requestItem->setId($key);
+                $requestItem->setStatus(ItemStatusInterface::STATUS_ACCEPTED);
+                $requestItems[] = $requestItem;
             } catch (\Exception $exception) {
-                $data = $entityParams;
-                //TODO after merge with BulkApi Status need change cons from OperationInterface::STATUS_TYPE_NOT_RETRIABLY_FAILED to OperationInterface::STATUS_TYPE_REJECTED
-                $operationStatus = OperationInterface::STATUS_TYPE_NOT_RETRIABLY_FAILED;
-            }
-            if (!isset($exception)) {
-                $operation = $this->saveOperation($groupId, $topicName, $data, $operationStatus);
-            } else {
-                $operation =
-                    $this->saveOperation(
-                        $groupId,
-                        $topicName,
-                        $data,
-                        $operationStatus,
-                        $exception->getMessage(),
-                        $exception->getCode()
-                    );
-            }
-            if (!isset($exception)) {
-                $operations[] = $operation;
-            }
-
-            $requestItem->setId($operation->getId());
-            $requestItem->setStatus(ItemStatusInterface::STATUS_ACCEPTED);
-
-            if (isset($exception)) {
+                $requestItem->setId($key);
                 $requestItem->setStatus(ItemStatusInterface::STATUS_REJECTED);
                 $requestItem->setErrorMessage($exception);
                 $requestItem->setErrorCode($exception);
-                unset($exception);
+                $errors[] = $requestItem;
             }
-
-            $requestItems[] = $requestItem;
+        }
+        if (!empty($errors)) {
+            throw new \Magento\Framework\Webapi\Exception(
+                __('Errors while processing entities'),
+                0,
+                \Magento\Framework\Webapi\Exception::HTTP_BAD_REQUEST,
+                $errors
+            );
         }
 
         $result = $this->bulkManagement->scheduleBulk($groupId, $operations, $bulkDescription, $userId);

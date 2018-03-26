@@ -6,6 +6,8 @@
 
 namespace Magento\WebapiAsync\Controller\Rest;
 
+use Magento\Framework\Exception\NotFoundException;
+use Magento\Framework\Phrase;
 use Magento\Webapi\Controller\Rest\RequestProcessorInterface;
 use Magento\Framework\Webapi\Rest\Response as RestResponse;
 use Magento\WebapiAsync\Controller\Rest\Async\InputParamsResolver;
@@ -16,7 +18,7 @@ use Magento\Framework\Reflection\DataObjectProcessor;
 
 class AsynchronousRequestProcessor implements RequestProcessorInterface
 {
-    const PROCESSOR_PATH = 'async/V1';
+    const PROCESSOR_PATH = "/async\\/V\\d+/";
 
     /**
      * @var \Magento\Framework\Webapi\Rest\Response
@@ -71,13 +73,11 @@ class AsynchronousRequestProcessor implements RequestProcessorInterface
      */
     public function process(\Magento\Framework\Webapi\Rest\Request $request)
     {
-        $request->setPathInfo(
-            str_replace(
-                self::PROCESSOR_PATH,
-                SynchronousRequestProcessor::PROCESSOR_PATH,
-                $request->getPathInfo()
-            )
-        );
+        if ($request->getHttpMethod() === \Magento\Framework\Webapi\Rest\Request::HTTP_METHOD_GET) {
+            throw new NotFoundException(new Phrase(__('Not found')));
+        }
+
+        $this->changePathInfo($request);
 
         try {
             $entitiesParamsArray = $this->inputParamsResolver->resolve();
@@ -101,12 +101,17 @@ class AsynchronousRequestProcessor implements RequestProcessorInterface
         }
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function getProcessorPath()
+    private function changePathInfo(\Magento\Framework\Webapi\Rest\Request $request)
     {
-        return self::PROCESSOR_PATH;
+        preg_match(self::PROCESSOR_PATH, $request->getPathInfo(), $asyncMatches);
+        preg_match(SynchronousRequestProcessor::PROCESSOR_PATH, $asyncMatches[0], $syncMatches);
+        $request->setPathInfo(
+            preg_replace(
+                self::PROCESSOR_PATH,
+                $syncMatches[0],
+                $request->getPathInfo()
+            )
+        );
     }
 
     /**
@@ -121,5 +126,17 @@ class AsynchronousRequestProcessor implements RequestProcessorInterface
             $route->getRoutePath(),
             $request->getHttpMethod()
         );
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function canProcess(\Magento\Framework\Webapi\Rest\Request $request)
+    {
+        if (preg_match(self::PROCESSOR_PATH, ltrim($request->getPathInfo(), '/')) === 1) {
+            return true;
+        }
+
+        return false;
     }
 }

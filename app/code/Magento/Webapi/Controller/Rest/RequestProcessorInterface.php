@@ -11,8 +11,9 @@ namespace Magento\Webapi\Controller\Rest;
  */
 interface RequestProcessorInterface
 {
-
     /**
+     * Executes the logic to process the request
+     *
      * @param \Magento\Framework\Webapi\Rest\Request $request
      * @return void
      * @throws \Magento\Framework\Exception\AuthorizationException
@@ -22,7 +23,12 @@ interface RequestProcessorInterface
     public function process(\Magento\Framework\Webapi\Rest\Request $request);
 
     /**
-     * @return string
+     * Method should return true for all the request current processor can process.
+     *
+     * Invoked in the loop for all registered request processors. The first one wins.
+     *
+     * @param \Magento\Framework\Webapi\Rest\Request $request
+     * @return bool
      */
-    public function getProcessorPath();
+    public function canProcess(\Magento\Framework\Webapi\Rest\Request $request);
 }
