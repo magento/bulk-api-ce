@@ -91,12 +91,12 @@ class InputParamsResolver
         //simple check if async request have single or bulk entities
         if (array_key_exists(0, $inputData)) {
             foreach ($inputData as $key => $singleParams) {
-                if (is_integer($key)) {
-                    $webapiResolvedParams[$key] = $this->resolveParams($singleParams);
+                if(is_integer($key)){
+                    $webapiResolvedParams[$key] = $this->resolveBulkParams($singleParams);
                 }
             }
         } else {//single item request
-            $webapiResolvedParams[] = $this->resolveParams($inputData);
+            $webapiResolvedParams[] = $this->resolveSingleParams($inputData);
         }
 
         return $webapiResolvedParams;
@@ -113,12 +113,39 @@ class InputParamsResolver
     /**
      * @return array|\Exception
      */
-    private function resolveParams($inputData)
+    private function resolveSingleParams($inputData)
     {
         $route = $this->getRoute();
         $serviceMethodName = $route->getServiceMethod();
         $serviceClassName = $route->getServiceClass();
 
+        /*
+         * Valid only for updates using PUT when passing id value both in URL and body
+         */
+        if ($this->request->getHttpMethod() == RestRequest::HTTP_METHOD_PUT) {
+            $inputData = $this->paramsOverrider->overrideRequestBodyIdWithPathParam(
+                $this->request->getParams(),
+                $inputData,
+                $serviceClassName,
+                $serviceMethodName
+            );
+            $inputData = array_merge($inputData, $this->request->getParams());
+        }
+
+        $inputData = $this->paramsOverrider->override($inputData, $route->getParameters());
+        $inputParams = $this->serviceInputProcessor->process($serviceClassName, $serviceMethodName, $inputData);
+
+        return $inputParams;
+    }
+
+    /**
+     * @return array|\Exception
+     */
+    private function resolveBulkParams($inputData)
+    {
+        $route = $this->getRoute();
+        $serviceMethodName = $route->getServiceMethod();
+        $serviceClassName = $route->getServiceClass();
         $inputParams = $this->serviceInputProcessor->process($serviceClassName, $serviceMethodName, $inputData);
 
         return $inputParams;
