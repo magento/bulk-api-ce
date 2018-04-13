@@ -2,12 +2,7 @@
 
 Magento uses Web API to cover the persistence operations of the business entities from the external clients. Some integrations require massive invocation of the Web API while persisting entities from the external systems. Usually it causes perfoemance and scalability issues both on the Magento system and on the external clients. This project is intended to provide a way for persisting big amounts of data in the Magento in efficient scalable way for the external system.
 
-## Repositories
-
-Bulk API track consists of 3 repositories:
-- current, https://github.com/magento-engcom/bulk-api is for documentation and tasks tracking
-- https://github.com/magento/bulk-api-ce is for contributions to the CE part of the Bulk API scope
-- https://github.com/magento/bulk-api-ee is for contribution to the EE part of the scope
+Documentation https://github.com/magento/bulk-api-ce/wiki
 
 ## Goals
 
