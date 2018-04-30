@@ -91,8 +91,21 @@ class OperationRepository
             ],
         ];
 
+        $this->_redis = new \Credis_Client("127.0.0.1", "6379", null, '', 0);
+        $this->_redis->pipeline()
+            ->select(0)
+            ->hMSet($groupId, array(
+                'data' => json_encode($data),
+                'lock' => 0, // 0 so that next lock attempt will get 1
+            ))
+            ->hIncrBy($groupId, 'writes', 1)
+            ->exec();
+
+//        $this->_redis->select(0);
+
         /** @var \Magento\AsynchronousOperations\Api\Data\OperationInterface $operation */
         $operation = $this->operationFactory->create($data);
+        return $operation;
         return $this->entityManager->save($operation);
     }
 }

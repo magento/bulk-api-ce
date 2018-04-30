@@ -89,27 +89,27 @@ class BulkManagement implements \Magento\Framework\Bulk\BulkManagementInterface
      */
     public function scheduleBulk($bulkUuid, array $operations, $description, $userId = null)
     {
-        $metadata = $this->metadataPool->getMetadata(BulkSummaryInterface::class);
-        $connection = $this->resourceConnection->getConnectionByName($metadata->getEntityConnectionName());
-        // save bulk summary and related operations
-        $connection->beginTransaction();
-        try {
-            /** @var \Magento\AsynchronousOperations\Api\Data\BulkSummaryInterface $bulkSummary */
-            $bulkSummary = $this->bulkSummaryFactory->create();
-            $this->entityManager->load($bulkSummary, $bulkUuid);
-            $bulkSummary->setBulkId($bulkUuid);
-            $bulkSummary->setDescription($description);
-            $bulkSummary->setUserId($userId);
-            $bulkSummary->setOperationCount((int)$bulkSummary->getOperationCount() + count($operations));
-
-            $this->entityManager->save($bulkSummary);
-
-            $connection->commit();
-        } catch (\Exception $exception) {
-            $connection->rollBack();
-            $this->logger->critical($exception->getMessage());
-            return false;
-        }
+//        $metadata = $this->metadataPool->getMetadata(BulkSummaryInterface::class);
+//        $connection = $this->resourceConnection->getConnectionByName($metadata->getEntityConnectionName());
+//        // save bulk summary and related operations
+//        $connection->beginTransaction();
+//        try {
+//            /** @var \Magento\AsynchronousOperations\Api\Data\BulkSummaryInterface $bulkSummary */
+//            $bulkSummary = $this->bulkSummaryFactory->create();
+//            $this->entityManager->load($bulkSummary, $bulkUuid);
+//            $bulkSummary->setBulkId($bulkUuid);
+//            $bulkSummary->setDescription($description);
+//            $bulkSummary->setUserId($userId);
+//            $bulkSummary->setOperationCount((int)$bulkSummary->getOperationCount() + count($operations));
+//
+//            $this->entityManager->save($bulkSummary);
+//
+//            $connection->commit();
+//        } catch (\Exception $exception) {
+//            $connection->rollBack();
+//            $this->logger->critical($exception->getMessage());
+//            return false;
+//        }
         $this->publishOperations($operations);
 
         return true;
